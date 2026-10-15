@@ -3,27 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>قارئ رمز QR للفواتير السعودية (ZATCA)</title>
+<title>قارئ رمز QR للفواتير السعودية</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- استخدام مكتبات موثوقة عبر CDN مع بدائل -->
+<!-- استخدام مكتبات عبر jsDelivr موثوقة جداً -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#f4f6f5; --surface:#ffffff; --text:#13231d; --muted:#5b6d64;
     --accent:#0c5c4c; --accent-ink:#ffffff; --gold:#a9792c; --border:#d9e2de;
-    --danger:#9c3b2c; --danger-bg:#fbeae6; --shadow:0 1px 2px rgba(15,35,28,.06);
+    --danger:#9c3b2c; --danger-bg:#fbeae6;
     color-scheme: light;
-  }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --bg:#0f1713; --surface:#16211c; --text:#eaf1ed; --muted:#9bb0a6;
-      --accent:#3fae8f; --accent-ink:#06130f; --gold:#d9ab5c; --border:#263830;
-      --danger:#ff8a73; --danger-bg:#2a1712;
-      color-scheme: dark;
-    }
   }
   *{box-sizing:border-box}
   body{
@@ -95,7 +87,6 @@
   .empty-state{color:var(--muted); font-size:0.85rem; text-align:center; padding:18px; border:1px dashed var(--border); border-radius:10px}
   .summary-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap}
   .summary-row span{color:var(--muted); font-size:0.85rem}
-  footer{margin-top:20px; color:var(--muted); font-size:0.75rem; line-height:1.6; text-align:center}
 </style>
 </head>
 <body>
@@ -220,7 +211,7 @@ camBtn.addEventListener('click', async () => {
     statusEl.textContent = 'وجّه الكاميرا نحو رمز الـ QR...';
     scanLoop();
   }catch(err){
-    showError('تعذّر تشغيل الكاميرا. تأكد من منح الصلاحيات أو تشغيل الصفحة عبر HTTPS أو localhost.');
+    showError('تعذّر تشغيل الكاميرا. تأكد من منح الصلاحيات أو تشغيل الصفحة عبر HTTPS.');
   }
 });
 
@@ -317,7 +308,7 @@ function renderTable(){
       <td><input data-idx="${idx}" data-field="invoiceNumber" dir="ltr" placeholder="أدخل الرقم" value="${escapeAttr(inv.invoiceNumber)}"></td>
       <td><input data-idx="${idx}" data-field="date" dir="ltr" value="${escapeAttr(inv.date)}"></td>
       <td><input data-idx="${idx}" data-field="taxable" dir="ltr" value="${escapeAttr(inv.taxable)}"></td>
-      <td><input data-idx="${idx}" data-field9="${idx}" data-field="vat" dir="ltr" value="${escapeAttr(inv.vat)}"></td>
+      <td><input data-idx="${idx}" data-field="vat" dir="ltr" value="${escapeAttr(inv.vat)}"></td>
       <td><input data-idx="${idx}" data-field="total" dir="ltr" value="${escapeAttr(inv.total)}"></td>
       <td><button class="del" data-idx="${idx}">✕</button></td>
     </tr>`).join('');
