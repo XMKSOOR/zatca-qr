@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>قارئ رمز QR للفواتير السعودية (ZATCA)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- استخدام مكتبات موثوقة عبر CDN مع بدائل -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6f5; --surface:#ffffff; --text:#13231d; --muted:#5b6d64;
+    --accent:#0c5c4c; --accent-ink:#ffffff; --gold:#a9792c; --border:#d9e2de;
+    --danger:#9c3b2c; --danger-bg:#fbeae6; --shadow:0 1px 2px rgba(15,35,28,.06);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1713; --surface:#16211c; --text:#eaf1ed; --muted:#9bb0a6;
+      --accent:#3fae8f; --accent-ink:#06130f; --gold:#d9ab5c; --border:#263830;
+      --danger:#ff8a73; --danger-bg:#2a1712;
+      color-scheme: dark;
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans Arabic', sans-serif;
+    display:flex; justify-content:center; padding:20px 16px 48px;
+  }
+  main{width:100%; max-width:780px}
+  header{margin-bottom:20px; text-align:center;}
+  h1{font-size:1.4rem; font-weight:700; margin:0 0 6px; color:var(--accent)}
+  header p{color:var(--muted); margin:0; font-size:0.9rem; line-height:1.5}
+
+  .tabs{display:flex; gap:8px; margin-bottom:16px}
+  .tab{
+    flex:1; padding:10px; border-radius:10px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text); font-family:inherit; font-size:0.9rem;
+    cursor:pointer; font-weight:600;
+  }
+  .tab[aria-selected="true"]{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+
+  .panel{display:none}
+  .panel.active{display:block}
+
+  .dropzone{
+    border:2px dashed var(--border); border-radius:14px; padding:28px 16px;
+    text-align:center; background:var(--surface); cursor:pointer;
+  }
+  .dropzone:hover{border-color:var(--accent)}
+  .dropzone p{margin:8px 0 0; color:var(--muted); font-size:0.9rem}
+
+  .cam-wrap{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px; text-align:center}
+  video{width:100%; border-radius:10px; background:#000; max-height:280px; object-fit:cover}
+  button.primary{
+    margin-top:12px; padding:10px 20px; border-radius:9px; border:none;
+    background:var(--accent); color:var(--accent-ink); font-family:inherit;
+    font-size:0.92rem; cursor:pointer; font-weight:600; width:100%;
+  }
+  button.primary:disabled{opacity:.45; cursor:default}
+
+  .status{margin-top:12px; font-size:0.88rem; color:var(--accent); min-height:1.2em; font-weight:600; text-align:center}
+  .error{
+    margin-top:12px; padding:10px 12px; border-radius:8px;
+    background:var(--danger-bg); color:var(--danger); font-size:0.85rem; line-height:1.5;
+  }
+
+  .report{margin-top:20px}
+  .field{margin-bottom:12px}
+  .field label{display:block; font-size:0.82rem; color:var(--muted); margin-bottom:4px}
+  .field input{
+    width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--border);
+    background:var(--surface); color:var(--text); font-family:inherit; font-size:0.9rem;
+  }
+
+  .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); margin-top:10px}
+  table{border-collapse:collapse; width:100%; min-width:720px; font-size:0.82rem}
+  thead th{
+    background:var(--bg); color:var(--muted); font-weight:600; text-align:center;
+    padding:8px 4px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  tbody td{padding:4px; border-bottom:1px solid var(--border); text-align:center}
+  tbody input{
+    width:100%; min-width:80px; border:1px solid transparent; background:transparent;
+    color:var(--text); font-family:inherit; font-size:0.82rem; padding:4px; border-radius:4px;
+    text-align:center;
+  }
+  tbody input:hover, tbody input:focus{border-color:var(--border); background:var(--bg)}
+  button.del{border:none; background:transparent; color:var(--danger); cursor:pointer; font-size:1rem; padding:2px 6px;}
+
+  .empty-state{color:var(--muted); font-size:0.85rem; text-align:center; padding:18px; border:1px dashed var(--border); border-radius:10px}
+  .summary-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; flex-wrap:wrap}
+  .summary-row span{color:var(--muted); font-size:0.85rem}
+  footer{margin-top:20px; color:var(--muted); font-size:0.75rem; line-height:1.6; text-align:center}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>قارئ رمز QR للفواتير السعودية</h1>
+    <p>امسح رموز QR من الفواتير الضريبية (صورة أو كاميرا) ونزّلها كملف إكسل.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-upload" aria-selected="true">رفع صورة</button>
+    <button class="tab" id="tab-camera" aria-selected="false">المسح بالكاميرا</button>
+  </div>
+
+  <section class="panel active" id="panel-upload">
+    <div class="dropzone" id="dropzone">
+      <p>📁 اضغط هنا لاختيار صورة الـ QR من جهازك</p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+  </section>
+
+  <section class="panel" id="panel-camera">
+    <div class="cam-wrap">
+      <video id="video" playsinline muted></video>
+      <button class="primary" id="camBtn">تشغيل الكاميرا</button>
+    </div>
+  </section>
+
+  <p class="status" id="status"></p>
+  <div id="errorBox"></div>
+
+  <section class="report">
+    <div class="field">
+      <label for="reportTitle">عنوان التقرير</label>
+      <input type="text" id="reportTitle" value="سجل المشتريات الضريبية">
+    </div>
+
+    <div class="table-wrap" id="invoicesWrap" style="display:none">
+      <table>
+        <thead><tr>
+          <th>م</th><th>اسم المورد</th><th>الرقم الضريبي</th><th>رقم الفاتورة</th>
+          <th>التاريخ</th><th>المبلغ الخاضع</th><th>الضريبة 15%</th><th>الإجمالي</th><th></th>
+        </tr></thead>
+        <tbody id="invoicesBody"></tbody>
+      </table>
+    </div>
+    <p class="empty-state" id="emptyState">لم تُضف أي فاتورة بعد.</p>
+
+    <div class="summary-row">
+      <span id="summary"></span>
+      <button class="primary" id="downloadBtn" disabled style="width:auto; margin-top:0;">⬇️ تنزيل ملف إكسل</button>
+    </div>
+  </section>
+</main>
+<canvas id="canvas" style="display:none"></canvas>
+
+<script>
+const tabUpload = document.getElementById('tab-upload');
+const tabCamera = document.getElementById('tab-camera');
+const panelUpload = document.getElementById('panel-upload');
+const panelCamera = document.getElementById('panel-camera');
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const video = document.getElementById('video');
+const camBtn = document.getElementById('camBtn');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const statusEl = document.getElementById('status');
+const errorBox = document.getElementById('errorBox');
+const invoicesWrap = document.getElementById('invoicesWrap');
+const invoicesBody = document.getElementById('invoicesBody');
+const emptyState = document.getElementById('emptyState');
+const summaryEl = document.getElementById('summary');
+const downloadBtn = document.getElementById('downloadBtn');
+
+let stream = null;
+let rafId = null;
+let invoices = [];
+
+function switchTab(toCamera){
+  tabUpload.setAttribute('aria-selected', String(!toCamera));
+  tabCamera.setAttribute('aria-selected', String(toCamera));
+  panelUpload.classList.toggle('active', !toCamera);
+  panelCamera.classList.toggle('active', toCamera);
+  if(!toCamera) stopCamera();
+}
+tabUpload.addEventListener('click', () => switchTab(false));
+tabCamera.addEventListener('click', () => switchTab(true));
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(file) handleImageFile(file);
+});
+
+function handleImageFile(file){
+  clearStatus();
+  statusEl.textContent = 'جارٍ تحليل الصورة...';
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = window.jsQR ? jsQR(data.data, data.width, data.height) : null;
+    statusEl.textContent = '';
+    if(code && code.data) processDecodedText(code.data);
+    else showError('لم يتم العثور على رمز QR واضح. تأكد من وضوح الصورة.');
+  };
+  img.onerror = () => { statusEl.textContent=''; showError('تعذّر قراءة ملف الصورة.'); };
+  img.src = URL.createObjectURL(file);
+}
+
+camBtn.addEventListener('click', async () => {
+  if(stream){ stopCamera(); return; }
+  try{
+    clearStatus();
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    video.srcObject = stream;
+    await video.play();
+    camBtn.textContent = 'إيقاف الكاميرا';
+    statusEl.textContent = 'وجّه الكاميرا نحو رمز الـ QR...';
+    scanLoop();
+  }catch(err){
+    showError('تعذّر تشغيل الكاميرا. تأكد من منح الصلاحيات أو تشغيل الصفحة عبر HTTPS أو localhost.');
+  }
+});
+
+function scanLoop(){
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = window.jsQR ? jsQR(data.data, data.width, data.height) : null;
+    if(code && code.data){
+      statusEl.textContent = '';
+      processDecodedText(code.data);
+      stopCamera();
+      return;
+    }
+  }
+  rafId = requestAnimationFrame(scanLoop);
+}
+
+function stopCamera(){
+  if(rafId) cancelAnimationFrame(rafId);
+  rafId = null;
+  if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  camBtn.textContent = 'تشغيل الكاميرا';
+}
+
+function clearStatus(){ errorBox.innerHTML = ''; statusEl.textContent = ''; }
+function showError(msg){ errorBox.innerHTML = `<div class="error">${msg}</div>`; }
+function escapeAttr(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function base64ToBytes(b64){
+  const bin = atob(b64.trim());
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function parseTLV(bytes){
+  const tags = {};
+  let i = 0;
+  const decoder = new TextDecoder('utf-8');
+  while(i + 1 < bytes.length){
+    const tag = bytes[i];
+    const len = bytes[i+1];
+    const start = i+2, end = start+len;
+    if(end > bytes.length) break;
+    tags[tag] = decoder.decode(bytes.slice(start, end));
+    i = end;
+  }
+  return tags;
+}
+
+function processDecodedText(text){
+  let tags;
+  try{ tags = parseTLV(base64ToBytes(text)); }catch(e){ tags = null; }
+
+  if(!tags || Object.keys(tags).length === 0){
+    showError('الرمز المقروء لا يطابق تنسيق فواتير زكاة وصدقة/ZATCA القياسي.');
+    return;
+  }
+
+  const total = parseFloat(tags[4]);
+  const vat = parseFloat(tags[5]);
+  const taxable = (!isNaN(total) && !isNaN(vat)) ? Math.round((total - vat) * 100) / 100 : '';
+
+  invoices.push({
+    seller: tags[1] || '',
+    vatNumber: tags[2] || '',
+    invoiceNumber: '',
+    date: tags[3] || '',
+    taxable: taxable,
+    vat: isNaN(vat) ? '' : vat,
+    total: isNaN(total) ? '' : total,
+  });
+  statusEl.textContent = 'تمت إضافة الفاتورة بنجاح!';
+  renderTable();
+}
+
+function renderTable(){
+  if(!invoices.length){
+    invoicesWrap.style.display = 'none';
+    emptyState.style.display = 'block';
+    updateSummary();
+    return;
+  }
+  emptyState.style.display = 'none';
+  invoicesWrap.style.display = 'block';
+  invoicesBody.innerHTML = invoices.map((inv, idx) => `
+    <tr>
+      <td>${idx+1}</td>
+      <td><input data-idx="${idx}" data-field="seller" value="${escapeAttr(inv.seller)}"></td>
+      <td><input data-idx="${idx}" data-field="vatNumber" dir="ltr" value="${escapeAttr(inv.vatNumber)}"></td>
+      <td><input data-idx="${idx}" data-field="invoiceNumber" dir="ltr" placeholder="أدخل الرقم" value="${escapeAttr(inv.invoiceNumber)}"></td>
+      <td><input data-idx="${idx}" data-field="date" dir="ltr" value="${escapeAttr(inv.date)}"></td>
+      <td><input data-idx="${idx}" data-field="taxable" dir="ltr" value="${escapeAttr(inv.taxable)}"></td>
+      <td><input data-idx="${idx}" data-field9="${idx}" data-field="vat" dir="ltr" value="${escapeAttr(inv.vat)}"></td>
+      <td><input data-idx="${idx}" data-field="total" dir="ltr" value="${escapeAttr(inv.total)}"></td>
+      <td><button class="del" data-idx="${idx}">✕</button></td>
+    </tr>`).join('');
+  updateSummary();
+}
+
+invoicesBody.addEventListener('input', e => {
+  const t = e.target;
+  if(t.dataset.field === undefined) return;
+  invoices[+t.dataset.idx][t.dataset.field] = t.value;
+});
+invoicesBody.addEventListener('click', e => {
+  if(e.target.classList.contains('del')){
+    invoices.splice(+e.target.dataset.idx, 1);
+    renderTable();
+  }
+});
+
+function updateSummary(){
+  const count = invoices.length;
+  const totalSum = invoices.reduce((s,i) => s + (parseFloat(i.total) || 0), 0);
+  summaryEl.textContent = count ? `عدد الفواتير: ${count} — الإجمالي: ${totalSum.toFixed(2)} ر.س` : '';
+  downloadBtn.disabled = !count;
+}
+
+downloadBtn.addEventListener('click', () => {
+  if(!invoices.length || !window.XLSX) return;
+  const title = document.getElementById('reportTitle').value || 'المشتريات';
+  const aoa = [[title], ['م','اسم المورد','الرقم الضريبي','رقم الفاتورة','التاريخ','المبلغ الخاضع','الضريبة','الإجمالي']];
+  invoices.forEach((inv, i) => aoa.push([i+1, inv.seller, inv.vatNumber, inv.invoiceNumber, inv.date, inv.taxable, inv.vat, inv.total]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'المشتريات');
+  XLSX.writeFile(wb, 'ZATCA_Invoices.xlsx');
+});
+</script>
+</body>
+</html>
